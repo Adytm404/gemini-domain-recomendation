@@ -43,7 +43,7 @@ const generatePrompt = (description: string): string => {
     3. "meaning": A brief, one-sentence explanation (max 15-20 words) of the domain's relevance, what it suggests, or its value proposition based on the user's description. This explanation should be concise and helpful. adjust to the user's language, if the user speaks Indonesian then display Indonesian, if English then English too and other languages.
 
     Do not include any other text, explanations, or markdown formatting outside the JSON array.
-    Ensure at least 9 suggestions are provided.
+    Ensure at least 9 suggestions are provided. 
 
     Example JSON output format:
     [
