@@ -31,6 +31,11 @@ export const translations: AllTranslations = {
     errorAiInvalidResponse: "The AI returned an invalid response format. Please try again or check the console for details.",
     errorInvalidApiKey: "Invalid Gemini API Key. Please check your configuration.",
     errorUnknownApi: "An unknown error occurred while communicating with the AI service.",
+    checkingAvailabilityStatus: "Checking availability...",
+    domainAvailable: "Available",
+    domainNotAvailable: "Not Available",
+    whoisCheckError: "Availability check failed: {error}",
+    buyDomainNotAvailableTitle: "This domain is likely not available.",
   },
   [Language.INDONESIAN]: {
     appTitle: "Penyaran Nama Domain AI",
@@ -62,5 +67,10 @@ export const translations: AllTranslations = {
     errorAiInvalidResponse: "AI mengembalikan format respons yang tidak valid. Silakan coba lagi atau periksa konsol untuk detailnya.",
     errorInvalidApiKey: "Kunci API Gemini tidak valid. Silakan periksa konfigurasi Anda.",
     errorUnknownApi: "Terjadi kesalahan yang tidak diketahui saat berkomunikasi dengan layanan AI.",
+    checkingAvailabilityStatus: "Memeriksa ketersediaan...",
+    domainAvailable: "Tersedia",
+    domainNotAvailable: "Tidak Tersedia",
+    whoisCheckError: "Pengecekan ketersediaan gagal: {error}",
+    buyDomainNotAvailableTitle: "Domain ini kemungkinan tidak tersedia.",
   }
 };

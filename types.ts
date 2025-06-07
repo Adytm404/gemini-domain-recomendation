@@ -1,7 +1,10 @@
 export interface DomainSuggestion {
   name: string;
   extension: string;
-  meaning: string; // Added to store the meaning/value of the domain
+  meaning: string;
+  isCheckingAvailability?: boolean;
+  isAvailable?: boolean;
+  whoisError?: string | null;
 }
 
 export enum Theme {
@@ -21,4 +24,12 @@ export interface Translations {
 export interface AllTranslations {
   [Language.ENGLISH]: Translations;
   [Language.INDONESIAN]: Translations;
+}
+
+export interface WhoisApiResponse {
+  success: boolean;
+  domain: string;
+  available: boolean;
+  whois_snippet?: string;
+  message?: string; // For error messages from WHOIS API
 }

@@ -4,27 +4,26 @@ import { DomainInput } from './components/DomainInput';
 import { SuggestionCard } from './components/SuggestionCard';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { generateDomainSuggestions } from './services/geminiService';
+import { checkDomainAvailability } from './services/whoisService'; // Added
 import { DomainSuggestion, Theme, Language, Translations } from './types';
 import { translations } from './translations';
 import { SparklesIcon } from './components/icons';
 
 const App: React.FC = () => {
   const [isEmbedView] = useState<boolean>(window.location.pathname === '/embed');
-  const [theme, setTheme] = useState<Theme>(isEmbedView ? Theme.LIGHT : Theme.LIGHT); // Default to light, embed forces light
+  const [theme, setTheme] = useState<Theme>(isEmbedView ? Theme.LIGHT : Theme.LIGHT);
   const [language, setLanguage] = useState<Language>(Language.INDONESIAN);
   const [currentTranslations, setCurrentTranslations] = useState<Translations>(translations[Language.INDONESIAN]);
   const [userInput, setUserInput] = useState<string>('');
   const [suggestions, setSuggestions] = useState<DomainSuggestion[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false); // For Gemini API loading
   const [error, setError] = useState<string | null>(null);
-  // Removed setIsEmbedView from useState as it's determined once.
 
   useEffect(() => {
-    // Theme initialization
     if (isEmbedView) {
-      setTheme(Theme.LIGHT); // Ensure theme state is light
+      setTheme(Theme.LIGHT);
       document.documentElement.classList.remove('dark');
-      document.documentElement.classList.add('light'); // Explicitly add light class for safety
+      document.documentElement.classList.add('light');
     } else {
       const storedTheme = localStorage.getItem('theme') as Theme | null;
       if (storedTheme) {
@@ -38,28 +37,26 @@ const App: React.FC = () => {
         setTheme(Theme.DARK);
         document.documentElement.classList.add('dark');
       } else {
-        setTheme(Theme.LIGHT); // Default to light if no preference and no storage for non-embed
+        setTheme(Theme.LIGHT);
         document.documentElement.classList.remove('dark');
       }
     }
 
-    // Language and initial document title initialization
     const storedLanguage = localStorage.getItem('language') as Language | null;
     const initialLang = storedLanguage || Language.INDONESIAN;
-    setLanguage(initialLang); // Set language state
+    setLanguage(initialLang);
     
     const effectiveTranslations = translations[initialLang];
     setCurrentTranslations(effectiveTranslations);
     document.documentElement.lang = initialLang;
     
     const titleKey = isEmbedView ? 'embedDocTitle' : 'docTitle';
-    document.title = effectiveTranslations[titleKey] || effectiveTranslations.docTitle; // Fallback to normal docTitle
+    document.title = effectiveTranslations[titleKey] || effectiveTranslations.docTitle;
 
-  }, [isEmbedView]); // Effect runs on mount and if isEmbedView changes (though it won't after mount)
+  }, [isEmbedView]);
 
   const toggleTheme = useCallback(() => {
-    if (isEmbedView) return; // Prevent theme toggling in embed view
-
+    if (isEmbedView) return;
     setTheme((prevTheme) => {
       const newTheme = prevTheme === Theme.LIGHT ? Theme.DARK : Theme.LIGHT;
       localStorage.setItem('theme', newTheme);
@@ -81,19 +78,48 @@ const App: React.FC = () => {
     
     const titleKey = isEmbedView ? 'embedDocTitle' : 'docTitle';
     document.title = newTranslations[titleKey] || newTranslations.docTitle;
-  }, [isEmbedView]); // Added isEmbedView as a dependency
+  }, [isEmbedView]);
 
   const handleGenerateDomains = async (description: string) => {
     setUserInput(description);
-    setIsLoading(true);
+    setIsLoading(true); // Start loading for Gemini
     setError(null);
     setSuggestions([]);
 
     try {
-      const result = await generateDomainSuggestions(description, currentTranslations);
-      setSuggestions(result);
+      const geminiSuggestions = await generateDomainSuggestions(description, currentTranslations);
+      
+      // Initialize suggestions with checking state
+      const initialSuggestions: DomainSuggestion[] = geminiSuggestions.map(s => ({
+        ...s,
+        isCheckingAvailability: true,
+        isAvailable: undefined,
+        whoisError: null,
+      }));
+      setSuggestions(initialSuggestions);
+      setIsLoading(false); // Stop Gemini loading, start WHOIS checks
+
+      // Perform WHOIS checks for each suggestion
+      initialSuggestions.forEach(async (suggestion, index) => {
+        const domainFullName = `${suggestion.name}${suggestion.extension}`;
+        const whoisResult = await checkDomainAvailability(domainFullName);
+        
+        setSuggestions(prevSuggestions => 
+          prevSuggestions.map((s, i) => 
+            i === index 
+            ? { 
+                ...s, 
+                isAvailable: whoisResult.isAvailable, 
+                whoisError: whoisResult.whoisError,
+                isCheckingAvailability: false 
+              } 
+            : s
+          )
+        );
+      });
+
     } catch (err: any) {
-      console.error("Error generating domains:", err);
+      console.error("Error generating domains or checking WHOIS:", err);
       let displayError = err.message || currentTranslations.errorUnknownApi;
       if (err.message === "Gemini API client is not initialized. Please ensure the API_KEY (process.env.API_KEY) is configured in your environment.") {
         displayError = currentTranslations.errorApiKeyNotConfigured;
@@ -105,12 +131,10 @@ const App: React.FC = () => {
         displayError = currentTranslations.errorInvalidApiKey;
       }
       setError(displayError);
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Ensure loading is stopped on error
     }
   };
   
-
   return (
     <div className={`min-h-screen flex flex-col bg-background-light dark:bg-background-dark text-textPrimary-light dark:text-textPrimary-dark transition-colors duration-300 ${isEmbedView && theme === Theme.LIGHT ? 'light' : ''}`}>
       {!isEmbedView && (
@@ -139,7 +163,8 @@ const App: React.FC = () => {
 
         <DomainInput onSubmit={handleGenerateDomains} isLoading={isLoading} t={currentTranslations} />
 
-        {isLoading && (
+        {/* This main isLoading is for Gemini. Individual card loading will be handled by SuggestionCard */}
+        {isLoading && ( 
           <div className="mt-12 flex justify-center">
             <LoadingSpinner t={currentTranslations} />
           </div>
@@ -152,6 +177,7 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {/* Render suggestions once Gemini loading is false, even if WHOIS checks are ongoing */}
         {!isLoading && !error && suggestions.length > 0 && (
           <div className="mt-12">
             {!isEmbedView && (
@@ -161,7 +187,11 @@ const App: React.FC = () => {
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {suggestions.map((suggestion, index) => (
-                <SuggestionCard key={`${suggestion.name}-${suggestion.extension}-${index}`} suggestion={suggestion} t={currentTranslations} />
+                <SuggestionCard 
+                  key={`${suggestion.name}-${suggestion.extension}-${index}`} 
+                  suggestion={suggestion} 
+                  t={currentTranslations} 
+                />
               ))}
             </div>
           </div>
