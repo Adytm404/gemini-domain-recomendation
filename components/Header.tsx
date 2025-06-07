@@ -1,7 +1,7 @@
-
 import React from 'react';
 import { ThemeToggle } from './ThemeToggle';
 import { LanguageToggle } from './LanguageToggle';
+import { EmbedButton } from './EmbedButton'; // Added
 import { Theme, Language, Translations } from '../types';
 import { DomainCheckIcon } from './icons';
 
@@ -24,6 +24,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTheme, toggleTheme, curre
           </h1>
         </div>
         <div className="flex items-center space-x-2">
+          <EmbedButton t={t} /> {/* Added */}
           <LanguageToggle
             currentLanguage={currentLanguage}
             switchLanguage={switchLanguage}

@@ -19,33 +19,24 @@ const generatePrompt = (description: string): string => {
     Based on the following user description, generate at least 10 creative and relevant domain name suggestions:
     "${description}"
 
-    When suggesting domains, consider the user's likely intent and choose appropriate extensions from the following list:
-    - .com: General purpose, primary choice for businesses and global reach.
-    - .net: Alternative to .com, suitable for network-based services, tech companies, or communities.
-    - .my.id: Ideal for personal websites, blogs, or portfolios for individuals in Indonesia.
-    - .id: Suitable for general purpose websites targeting an Indonesian audience, including businesses and organizations.
-    - .co.id: Specifically for registered companies or commercial entities operating in Indonesia.
-    - .store: Best for e-commerce websites, online shops, and retail businesses.
-    - .site: A versatile and generic extension for any type of website, project, or business.
-    - .space: Good for creative individuals, communities, personal branding, or projects with a unique focus.
-    - .fun: Perfect for entertainment-focused websites, hobbies, games, or light-hearted projects.
-    - .sbs: Stands for "Side By Side." Good for social causes, community projects, comparison sites, or as a budget-friendly generic option.
-    - .top: Can be used for high-quality content, review sites, ranking platforms, or as a memorable generic TLD.
+    Consider these TLD options: .com, .net, .my.id, .id, .co.id, .store, .site, .space, .fun, .sbs, .top.
+    Match the TLD to the user's likely intent. For example:
+    - Online bakery in Jakarta: "jakartabakery.co.id", "sweetreats.store", "cakecreations.id".
+    - Personal coding blog (Indonesian audience): "mycodejourney.my.id", "devdiary.id", "projectcode.space".
+    - Global tech startup (social network): "connectsphere.com", "sociatenow.net", "globalhub.site".
 
-    For example:
-    - If the description is "an online bakery selling custom cakes in Jakarta", prioritize suggestions like "jakartabakery.co.id", "sweetreats.store", "cakecreations.id".
-    - If the description is "a personal blog about my coding journey and projects targeting Indonesian readers", consider "mycodejourney.my.id", "devdiary.id", "projectcode.space".
-    - If the description is "a global tech startup building a new social networking platform", suggest "connectsphere.com", "sociatenow.net", "globalhub.site".
+    Provide your output ONLY as a JSON array of objects. Each object must have exactly three keys:
+    1. "name": (string) The domain name part (e.g., "exampledomain"). Must be lowercase alphanumeric. Hyphens are allowed but should be used sparingly. No other special characters or spaces.
+    2. "extension": (string) The domain extension, starting with a dot (e.g., ".com").
+    3. "meaning": (string) A brief, one-sentence explanation (10-20 words) of the domain's relevance. THIS VALUE MUST BE PURE TEXT. NO EXTRA CHARACTERS, WORDS, OR COMMENTARY ARE ALLOWED AFTER THIS TEXT STRING AND BEFORE THE NEXT JSON TOKEN (A COMMA OR A CLOSING BRACE).
 
-    Provide your output ONLY as a JSON array of objects. Each object must have three keys:
-    1. "name": The domain name part (without the extension, using only lowercase alphanumeric characters, no spaces or special symbols other than hyphens if absolutely necessary and common in domains).
-    2. "extension": The domain extension (including the leading dot, e.g., ".com").
-    3. "meaning": A brief, one-sentence explanation (max 15-20 words) of the domain's relevance, what it suggests, or its value proposition based on the user's description. This explanation should be concise and helpful. adjust to the user's language, if the user speaks Indonesian then display Indonesian, if English then English too and other languages.
+    STRICT JSON OUTPUT RULES:
+    - Your entire response MUST start with '[' and end with ']'.
+    - No text, comments, explanations, or markdown formatting should appear anywhere outside this single JSON array.
+    - Inside each JSON object, after the "meaning" string value and its closing double quote ("), there MUST be either a comma (,) if it's not the last object in the array, or a closing curly brace (}) if it is the last property in an object. ABSOLUTELY NO OTHER TEXT OR CHARACTERS ARE PERMITTED IN THIS POSITION.
+    - Ensure at least 10 valid suggestions are provided in the array.
 
-    Do not include any other text, explanations, or markdown formatting outside the JSON array.
-    Ensure at least 9 suggestions are provided. 
-
-    Example JSON output format:
+    Example of the exact JSON output format (YOUR RESPONSE MUST FOLLOW THIS STRUCTURE PRECISELY):
     [
       { "name": "exampledomain", "extension": ".com", "meaning": "This domain is great for general examples." },
       { "name": "youridea", "extension": ".site", "meaning": "A versatile site for your unique idea." }
@@ -78,7 +69,7 @@ const parseDomainSuggestions = (jsonString: string, t: Translations): DomainSugg
       return {
         name: item.name,
         extension: item.extension,
-        meaning: item.meaning,
+        meaning: item.meaning.replace(/\s+/g, ' ').trim(), 
       };
     });
   } catch (error) {
@@ -101,8 +92,8 @@ export const generateDomainSuggestions = async (description: string, t: Translat
         model: 'gemini-2.5-flash-preview-04-17',
         contents: prompt,
         config: {
-            responseMimeType: "application/json", // Request JSON directly
-            temperature: 0.7, // Add some creativity
+            responseMimeType: "application/json", 
+            temperature: 0.7, 
         }
     });
     
@@ -117,7 +108,15 @@ export const generateDomainSuggestions = async (description: string, t: Translat
     if (error.message && error.message.includes("API key not valid")) {
       throw new Error(t.errorInvalidApiKey || "Invalid Gemini API Key. Please check your configuration.");
     }
-    // Let the App.tsx handle general error messages based on the error type
-    throw error;
+    // If the error is already one of our specific translated errors, rethrow it.
+    if (error.message === t.errorApiKeyNotConfigured || 
+        error.message === t.errorAiFormat || 
+        error.message === t.errorAiInvalidResponse ||
+        error.message === t.errorInvalidApiKey) {
+      throw error;
+    }
+    // For other errors, throw the generic invalid response error or its original message
+    // if it's more descriptive and not already a translated one.
+    throw new Error(error.message || t.errorAiInvalidResponse || "The AI returned an invalid response format. Please try again or check the console for details.");
   }
 };

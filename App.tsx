@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { DomainInput } from './components/DomainInput';
@@ -10,35 +9,57 @@ import { translations } from './translations';
 import { SparklesIcon } from './components/icons';
 
 const App: React.FC = () => {
-  const [theme, setTheme] = useState<Theme>(Theme.LIGHT);
+  const [isEmbedView] = useState<boolean>(window.location.pathname === '/embed');
+  const [theme, setTheme] = useState<Theme>(isEmbedView ? Theme.LIGHT : Theme.LIGHT); // Default to light, embed forces light
   const [language, setLanguage] = useState<Language>(Language.INDONESIAN);
   const [currentTranslations, setCurrentTranslations] = useState<Translations>(translations[Language.INDONESIAN]);
   const [userInput, setUserInput] = useState<string>('');
   const [suggestions, setSuggestions] = useState<DomainSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  // Removed setIsEmbedView from useState as it's determined once.
 
   useEffect(() => {
-    const storedTheme = localStorage.getItem('theme') as Theme | null;
-    if (storedTheme) {
-      setTheme(storedTheme);
-      if (storedTheme === Theme.DARK) {
+    // Theme initialization
+    if (isEmbedView) {
+      setTheme(Theme.LIGHT); // Ensure theme state is light
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light'); // Explicitly add light class for safety
+    } else {
+      const storedTheme = localStorage.getItem('theme') as Theme | null;
+      if (storedTheme) {
+        setTheme(storedTheme);
+        if (storedTheme === Theme.DARK) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        setTheme(Theme.DARK);
         document.documentElement.classList.add('dark');
+      } else {
+        setTheme(Theme.LIGHT); // Default to light if no preference and no storage for non-embed
+        document.documentElement.classList.remove('dark');
       }
-    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme(Theme.DARK);
-      document.documentElement.classList.add('dark');
     }
 
+    // Language and initial document title initialization
     const storedLanguage = localStorage.getItem('language') as Language | null;
-    const initialLanguage = storedLanguage || Language.INDONESIAN;
-    setLanguage(initialLanguage);
-    setCurrentTranslations(translations[initialLanguage]);
-    document.documentElement.lang = initialLanguage;
-    document.title = translations[initialLanguage].docTitle;
-  }, []);
+    const initialLang = storedLanguage || Language.INDONESIAN;
+    setLanguage(initialLang); // Set language state
+    
+    const effectiveTranslations = translations[initialLang];
+    setCurrentTranslations(effectiveTranslations);
+    document.documentElement.lang = initialLang;
+    
+    const titleKey = isEmbedView ? 'embedDocTitle' : 'docTitle';
+    document.title = effectiveTranslations[titleKey] || effectiveTranslations.docTitle; // Fallback to normal docTitle
+
+  }, [isEmbedView]); // Effect runs on mount and if isEmbedView changes (though it won't after mount)
 
   const toggleTheme = useCallback(() => {
+    if (isEmbedView) return; // Prevent theme toggling in embed view
+
     setTheme((prevTheme) => {
       const newTheme = prevTheme === Theme.LIGHT ? Theme.DARK : Theme.LIGHT;
       localStorage.setItem('theme', newTheme);
@@ -49,15 +70,18 @@ const App: React.FC = () => {
       }
       return newTheme;
     });
-  }, []);
+  }, [isEmbedView]);
 
   const switchLanguage = useCallback((lang: Language) => {
     setLanguage(lang);
-    setCurrentTranslations(translations[lang]);
+    const newTranslations = translations[lang];
+    setCurrentTranslations(newTranslations);
     localStorage.setItem('language', lang);
     document.documentElement.lang = lang;
-    document.title = translations[lang].docTitle;
-  }, []);
+    
+    const titleKey = isEmbedView ? 'embedDocTitle' : 'docTitle';
+    document.title = newTranslations[titleKey] || newTranslations.docTitle;
+  }, [isEmbedView]); // Added isEmbedView as a dependency
 
   const handleGenerateDomains = async (description: string) => {
     setUserInput(description);
@@ -70,7 +94,6 @@ const App: React.FC = () => {
       setSuggestions(result);
     } catch (err: any) {
       console.error("Error generating domains:", err);
-      // Use translated error messages if available, otherwise use the raw message.
       let displayError = err.message || currentTranslations.errorUnknownApi;
       if (err.message === "Gemini API client is not initialized. Please ensure the API_KEY (process.env.API_KEY) is configured in your environment.") {
         displayError = currentTranslations.errorApiKeyNotConfigured;
@@ -89,26 +112,30 @@ const App: React.FC = () => {
   
 
   return (
-    <div className={`min-h-screen flex flex-col bg-background-light dark:bg-background-dark text-textPrimary-light dark:text-textPrimary-dark transition-colors duration-300`}>
-      <Header
-        currentTheme={theme}
-        toggleTheme={toggleTheme}
-        currentLanguage={language}
-        switchLanguage={switchLanguage}
-        t={currentTranslations}
-      />
-      <main className="flex-grow container mx-auto px-4 py-8 max-w-4xl">
-        <div className="text-center mb-12">
-          <div className="inline-block p-3 bg-primary-light dark:bg-primary-dark rounded-full mb-4">
-            <SparklesIcon className="w-10 h-10 text-white" />
+    <div className={`min-h-screen flex flex-col bg-background-light dark:bg-background-dark text-textPrimary-light dark:text-textPrimary-dark transition-colors duration-300 ${isEmbedView && theme === Theme.LIGHT ? 'light' : ''}`}>
+      {!isEmbedView && (
+        <Header
+          currentTheme={theme}
+          toggleTheme={toggleTheme}
+          currentLanguage={language}
+          switchLanguage={switchLanguage}
+          t={currentTranslations}
+        />
+      )}
+      <main className={`flex-grow container mx-auto px-4 ${isEmbedView ? 'py-4 sm:py-6' : 'py-8'} max-w-4xl`}>
+        {!isEmbedView && (
+          <div className="text-center mb-12">
+            <div className="inline-block p-3 bg-primary-light dark:bg-primary-dark rounded-full mb-4">
+              <SparklesIcon className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-textPrimary-light dark:text-textPrimary-dark">
+              {currentTranslations.findYourDomain}
+            </h1>
+            <p className="text-lg text-textSecondary-light dark:text-textSecondary-dark max-w-2xl mx-auto">
+              {currentTranslations.appDescription}
+            </p>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-textPrimary-light dark:text-textPrimary-dark">
-            {currentTranslations.findYourDomain}
-          </h1>
-          <p className="text-lg text-textSecondary-light dark:text-textSecondary-dark max-w-2xl mx-auto">
-            {currentTranslations.appDescription}
-          </p>
-        </div>
+        )}
 
         <DomainInput onSubmit={handleGenerateDomains} isLoading={isLoading} t={currentTranslations} />
 
@@ -127,9 +154,11 @@ const App: React.FC = () => {
 
         {!isLoading && !error && suggestions.length > 0 && (
           <div className="mt-12">
-            <h2 className="text-2xl font-semibold mb-6 text-center text-textPrimary-light dark:text-textPrimary-dark">
-              {currentTranslations.generatedSuggestionsTitle}
-            </h2>
+            {!isEmbedView && (
+              <h2 className="text-2xl font-semibold mb-6 text-center text-textPrimary-light dark:text-textPrimary-dark">
+                {currentTranslations.generatedSuggestionsTitle}
+              </h2>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {suggestions.map((suggestion, index) => (
                 <SuggestionCard key={`${suggestion.name}-${suggestion.extension}-${index}`} suggestion={suggestion} t={currentTranslations} />
@@ -143,9 +172,11 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
-      <footer className="py-6 text-center text-sm text-textSecondary-light dark:text-textSecondary-dark border-t border-borderLight dark:border-borderDark">
-        <p>{currentTranslations.footerText.replace('{year}', new Date().getFullYear().toString())}</p>
-      </footer>
+      {!isEmbedView && (
+        <footer className="py-6 text-center text-sm text-textSecondary-light dark:text-textSecondary-dark border-t border-borderLight dark:border-borderDark">
+          <p>{currentTranslations.footerText.replace('{year}', new Date().getFullYear().toString())}</p>
+        </footer>
+      )}
     </div>
   );
 };

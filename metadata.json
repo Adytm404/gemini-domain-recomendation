@@ -1,5 +1,6 @@
 {
   "name": "AI Domain Name Suggester",
   "description": "A web application that uses AI to generate domain name suggestions based on a user's concept, with various TLD options and contextual recommendations.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "prompt": ""
 }
