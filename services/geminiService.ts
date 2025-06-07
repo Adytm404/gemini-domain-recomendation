@@ -28,7 +28,7 @@ const generatePrompt = (description: string): string => {
     Provide your output ONLY as a JSON array of objects. Each object must have exactly three keys:
     1. "name": (string) The domain name part (e.g., "exampledomain"). Must be lowercase alphanumeric. Hyphens are allowed but should be used sparingly. No other special characters or spaces.
     2. "extension": (string) The domain extension, starting with a dot (e.g., ".com").
-    3. "meaning": (string) A brief, one-sentence explanation (10-20 words) of the domain's relevance. THIS VALUE MUST BE PURE TEXT. NO EXTRA CHARACTERS, WORDS, OR COMMENTARY ARE ALLOWED AFTER THIS TEXT STRING AND BEFORE THE NEXT JSON TOKEN (A COMMA OR A CLOSING BRACE).
+    3. "meaning": (string) A brief, one-sentence explanation (10-20 words) of the domain's relevance and follow the language used in the input, if input with indonesian so write meaning on indonesian too. THIS VALUE MUST BE PURE TEXT. NO EXTRA CHARACTERS, WORDS, OR COMMENTARY ARE ALLOWED AFTER THIS TEXT STRING AND BEFORE THE NEXT JSON TOKEN (A COMMA OR A CLOSING BRACE).
 
     STRICT JSON OUTPUT RULES:
     - Your entire response MUST start with '[' and end with ']'.
