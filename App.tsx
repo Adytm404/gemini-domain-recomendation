@@ -80,14 +80,26 @@ const App: React.FC = () => {
     document.title = newTranslations[titleKey] || newTranslations.docTitle;
   }, [isEmbedView]);
 
-  const handleGenerateDomains = async (description: string) => {
+  const handleGenerateDomains = async (
+    description: string, 
+    useCustomExt: boolean, 
+    customExtValue: string,
+    includeKeyword: string,
+    numberOfSuggestions: number
+  ) => {
     setUserInput(description);
     setIsLoading(true); // Start loading for Gemini
     setError(null);
     setSuggestions([]);
 
     try {
-      const geminiSuggestions = await generateDomainSuggestions(description, currentTranslations);
+      const geminiSuggestions = await generateDomainSuggestions(
+        description, 
+        currentTranslations, 
+        useCustomExt ? customExtValue : undefined,
+        includeKeyword,
+        numberOfSuggestions
+      );
       
       // Initialize suggestions with checking state
       const initialSuggestions: DomainSuggestion[] = geminiSuggestions.map(s => ({

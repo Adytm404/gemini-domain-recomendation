@@ -12,14 +12,53 @@ if (API_KEY) {
   console.error("Gemini API Key (process.env.API_KEY) is not configured. The application will not be able to generate domain suggestions.");
 }
 
+const parseCustomTLDs = (customExtensionString?: string): string[] => {
+  if (!customExtensionString || !customExtensionString.trim()) {
+    return [];
+  }
+  return customExtensionString
+    .split(',')
+    .map(ext => ext.trim().toLowerCase())
+    .filter(ext => ext.length > 1 && ext.startsWith('.')) 
+    .filter((value, index, self) => self.indexOf(value) === index); 
+};
+
 // The prompt to the AI should remain in English for optimal performance and understanding by the model.
-const generatePrompt = (description: string): string => {
+const generatePrompt = (
+  description: string, 
+  customTLDs?: string[],
+  includeKeyword?: string,
+  numberOfSuggestions?: number
+): string => {
+  let tldInstructions = "";
+  if (customTLDs && customTLDs.length > 0) {
+    tldInstructions = `Strictly use ONLY the following TLD options: ${customTLDs.join(', ')}. Do not use any other TLDs.`;
+  } else {
+    tldInstructions = "Consider these TLD options: .com, .net, .my.id, .id, .co.id, .store, .site, .space, .fun, .sbs, .top.";
+  }
+
+  let keywordInstruction = "";
+  if (includeKeyword && includeKeyword.trim() !== "") {
+    keywordInstruction = `All suggested domain names MUST include the keyword "${includeKeyword.trim()}". This keyword can appear anywhere within the name part of the domain (before the extension). For example, if the keyword is "gaming", suggestions like "progamingsetup.com" or "bestgamingdeals.store" are valid.`;
+  }
+
+  let numSuggestionsInstruction = "generate at least 10 creative and relevant domain name suggestions";
+  if (numberOfSuggestions && numberOfSuggestions >= 1 && numberOfSuggestions <= 20) {
+    numSuggestionsInstruction = `generate exactly ${numberOfSuggestions} creative and relevant domain name suggestions`;
+  } else if (numberOfSuggestions && (numberOfSuggestions < 1 || numberOfSuggestions > 20)) {
+    // If an invalid number is somehow passed (though UI should prevent), default to 10 for safety.
+    numSuggestionsInstruction = `generate exactly 10 creative and relevant domain name suggestions`;
+  }
+
+
   return `
     You are an expert domain name suggestion AI.
-    Based on the following user description, generate at least 10 creative and relevant domain name suggestions:
+    Based on the following user description, ${numSuggestionsInstruction}:
     "${description}"
 
-    Consider these TLD options: .com, .net, .my.id, .id, .co.id, .store, .site, .space, .fun, .sbs, .top.
+    ${tldInstructions}
+    ${keywordInstruction}
+
     Match the TLD to the user's likely intent. For example:
     - Online bakery in Jakarta: "jakartabakery.co.id", "sweetreats.store", "cakecreations.id".
     - Personal coding blog (Indonesian audience): "mycodejourney.my.id", "devdiary.id", "projectcode.space".
@@ -27,14 +66,16 @@ const generatePrompt = (description: string): string => {
 
     Provide your output ONLY as a JSON array of objects. Each object must have exactly three keys:
     1. "name": (string) The domain name part (e.g., "exampledomain"). Must be lowercase alphanumeric. Hyphens are allowed but should be used sparingly. No other special characters or spaces.
-    2. "extension": (string) The domain extension, starting with a dot (e.g., ".com").
+    2. "extension": (string) The domain extension, starting with a dot (e.g., ".com"). This MUST be one of the TLDs specified in the TLD options.
     3. "meaning": (string) A brief, one-sentence explanation (10-20 words) of the domain's relevance and follow the language used in the input, if input with indonesian so write meaning on indonesian too. THIS VALUE MUST BE PURE TEXT. NO EXTRA CHARACTERS, WORDS, OR COMMENTARY ARE ALLOWED AFTER THIS TEXT STRING AND BEFORE THE NEXT JSON TOKEN (A COMMA OR A CLOSING BRACE).
 
     STRICT JSON OUTPUT RULES:
     - Your entire response MUST start with '[' and end with ']'.
     - No text, comments, explanations, or markdown formatting should appear anywhere outside this single JSON array.
     - Inside each JSON object, after the "meaning" string value and its closing double quote ("), there MUST be either a comma (,) if it's not the last object in the array, or a closing curly brace (}) if it is the last property in an object. ABSOLUTELY NO OTHER TEXT OR CHARACTERS ARE PERMITTED IN THIS POSITION.
-    - Ensure at least 10 valid suggestions are provided in the array.
+    - Ensure the requested number of valid suggestions are provided in the array.
+    - If custom TLDs were specified, all suggestions MUST use one of those TLDs.
+    - If a keyword was specified to be included, all domain names MUST contain that keyword.
 
     Example of the exact JSON output format (YOUR RESPONSE MUST FOLLOW THIS STRUCTURE PRECISELY):
     [
@@ -79,13 +120,25 @@ const parseDomainSuggestions = (jsonString: string, t: Translations): DomainSugg
   }
 };
 
-export const generateDomainSuggestions = async (description: string, t: Translations): Promise<DomainSuggestion[]> => {
+export const generateDomainSuggestions = async (
+  description: string, 
+  t: Translations, 
+  customExtensionString?: string,
+  includeKeyword?: string,
+  numberOfSuggestions?: number
+): Promise<DomainSuggestion[]> => {
   if (!ai) {
     console.error("Gemini AI client not initialized.");
     throw new Error(t.errorApiKeyNotConfigured || "Gemini API client is not initialized. Please ensure the API_KEY (process.env.API_KEY) is configured in your environment.");
   }
 
-  const prompt = generatePrompt(description);
+  const customTLDs = parseCustomTLDs(customExtensionString);
+  // Ensure numberOfSuggestions is valid for the prompt, default to 10 if not provided or invalid.
+  const validNumSuggestions = (numberOfSuggestions && numberOfSuggestions >= 1 && numberOfSuggestions <= 20) 
+                              ? numberOfSuggestions 
+                              : 10;
+
+  const prompt = generatePrompt(description, customTLDs, includeKeyword, validNumSuggestions);
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
